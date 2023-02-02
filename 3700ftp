@@ -160,7 +160,7 @@ def download_file(s, src, dest):
     send_command(s, "RETR " + src + "\r\n")
     print(receive_data(s))
     with open(dest, 'wb') as file:
-        file.write(receive_data(data_channel).encode('utf-8'))
+        file.write(receive_data(data_channel).encode('UTF-8'))
         data_channel.close()
     print(receive_data(s))
 
@@ -175,7 +175,7 @@ def upload_file(s, src, dest):
     send_command(s, "STOR " + dest + "\r\n")
     print(receive_data(s))
     with open(src, 'rb') as local_file:
-        send_command(data_channel, local_file.read().decode())
+        send_command(data_channel, local_file.read().decode('UTF-8'))
         data_channel.close()
 
 
