@@ -195,29 +195,28 @@ def main(operation, paths, port):
     username, password, network, remote_path = parse_ftp(ftp_url)
     login(s, username, password)
 
-    match operation:
-        case "ls":
-            list_dir(s, remote_path)
-        case "mkdir":
-            send_command(s, "MKD " + remote_path + "\r\n")
-        case "rm":
+    if operation == "ls":
+        list_dir(s, remote_path)
+    elif operation == "mkdir":
+        send_command(s, "MKD " + remote_path + "\r\n")
+    elif operation == "rm":
+        remove_file(s, remote_path)
+    elif operation == "rmdir":
+        send_command(s, "RMD " + remote_path + "\r\n")
+    elif operation == "cp":
+        if first_path_remote:
+            download_file(s, remote_path, paths[1])
+        else:
+            upload_file(s, paths[0], remote_path)
+    elif operation == "mv":
+        if first_path_remote:
+            download_file(s, remote_path, paths[1])
             remove_file(s, remote_path)
-        case "rmdir":
-            send_command(s, "RMD " + remote_path + "\r\n")
-        case "cp":
-            if first_path_remote:
-                download_file(s, remote_path, paths[1])
-            else:
-                upload_file(s, paths[0], remote_path)
-        case "mv":
-            if first_path_remote:
-                download_file(s, remote_path, paths[1])
-                remove_file(s, remote_path)
-            else:
-                upload_file(s, paths[0], remote_path)
-                os.remove(paths[0])
-        case _:
-            print("ERROR")
+        else:
+            upload_file(s, paths[0], remote_path)
+            os.remove(paths[0])
+    else:
+        print("ERROR")
 
     send_command(s, "QUIT\r\n")
     print(receive_data(s))
