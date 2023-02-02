@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+
+import socket
+import argparse
+import os
+from urllib.parse import urlparse
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Process connection arguments")
+    parser.add_argument("operation")
+    parser.add_argument("-p", "--port", required=False, default=21)
+    parser.add_argument("paths", nargs='+')
+
+    argument = parser.parse_args()
+
+    return argument.operation, argument.paths, argument.port
+
+
+'''
+Connects to to given host using the given port using TLS encryption if specified by the flag
+'''
+
+
+def connect_to_server(hostname, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(10)
+
+    sock.connect((hostname, port))
+    return sock
+
+
+'''
+Returns the username, password, network, and path from the FTP URL
+'''
+
+
+def parse_ftp(ftp_url):
+    parsed_url = urlparse(ftp_url, scheme='ftp')
+
+    username = parsed_url.username
+    password = parsed_url.password
+    network = parsed_url.hostname
+    path = parsed_url.path
+
+    return username, password, network, path
+
+
+'''
+Logs the user into the server and adjusts settings
+'''
+
+
+def login(s, username, password):
+    # Login to server
+    send_command(s, "USER " + username + "\r\n")
+    print(receive_data(s))
+    send_command(s, "PASS " + password + "\r\n")
+    print(receive_data(s))
+
+    # Configure settings
+    send_command(s, "TYPE I\r\n")
+    print(receive_data(s))
+    send_command(s, "MODE S\r\n")
+    print(receive_data(s))
+    send_command(s, "STRU F\r\n")
+    print(receive_data(s))
+
+
+'''
+Receives a message from the server
+'''
+
+
+def receive_data(s):
+    blocks = []
+    msg_end = False
+    while not msg_end:
+        block = s.recv(2048)
+        if block == b'' and message:
+            return message
+        blocks.append(block)
+        message = b''.join(blocks).decode('UTF-8')
+        if '\r\n' in message:
+            return message
+        else:
+            continue
+
+
+'''
+Sends a command to the server and prints the server's response
+'''
+
+
+def send_command(s, message):
+    s.send(message.encode())
+
+
+'''
+Opens and returns a new data channel
+'''
+
+
+def open_data_channel(control_channel):
+    send_command(control_channel, "PASV\r\n")
+    response = receive_data(control_channel)
+    print(response)
+
+    if response[0:3] != "227":
+        print("hmmmm")
+
+    response = response.split('(')[1]
+    response = response.strip(').\r\n')
+    response_numbers = response.split(',')
+    ip_address = '.'.join(response_numbers[0:4])
+    port = (int(response_numbers[4]) << 8) + int(response_numbers[5])
+
+    return connect_to_server(ip_address, port)
+
+
+'''
+Sends a LIST command to the server with the given path
+'''
+
+
+def list_dir(s, path):
+    data_channel = open_data_channel(s)
+    send_command(s, "LIST " + path + "\r\n")
+    print(receive_data(s))
+    print(receive_data(data_channel))
+    data_channel.close()
+    print(receive_data(s))
+
+
+'''
+Deletes the file at the given path from the server
+'''
+
+
+def remove_file(s, path):
+    data_channel = open_data_channel(s)
+    send_command(s, "DELE " + path + "\r\n")
+    response = receive_data(s)
+    print(response)
+    if "550" in response:
+        print("Failed to remove file, make sure the file exists on the server before removing")
+
+
+'''
+Downloads a file from the server to the local environment
+'''
+
+
+def download_file(s, src, dest):
+    data_channel = open_data_channel(s)
+    send_command(s, "RETR " + src + "\r\n")
+    print(receive_data(s))
+    with open(dest, 'w') as file:
+        file.write(receive_data(data_channel))
+        data_channel.close()
+    print(receive_data(s))
+
+
+'''
+Uploads a file from the local environment to the server
+'''
+
+
+def upload_file(s, src, dest):
+    data_channel = open_data_channel(s)
+    send_command(s, "STOR " + dest + "\r\n")
+    print(receive_data(s))
+    with open(src, 'r') as local_file:
+        send_command(data_channel, local_file.read())
+        data_channel.close()
+
+
+'''
+Main method
+'''
+
+
+def main(operation, paths, port):
+    # Connect to the server
+    s = connect_to_server("ftp.3700.network", port)
+    print(receive_data(s))
+
+    if paths[0][0:6] == "ftp://":
+        ftp_url = paths[0]
+        first_path_remote = True
+    else:
+        ftp_url = paths[1]
+        first_path_remote = False
+
+    username, password, network, remote_path = parse_ftp(ftp_url)
+    login(s, username, password)
+
+    match operation:
+        case "ls":
+            list_dir(s, remote_path)
+        case "mkdir":
+            send_command(s, "MKD " + remote_path + "\r\n")
+        case "rm":
+            remove_file(s, remote_path)
+        case "rmdir":
+            send_command(s, "RMD " + remote_path + "\r\n")
+        case "cp":
+            if first_path_remote:
+                download_file(s, remote_path, paths[1])
+            else:
+                upload_file(s, paths[0], remote_path)
+        case "mv":
+            if first_path_remote:
+                download_file(s, remote_path, paths[1])
+                remove_file(s, remote_path)
+            else:
+                upload_file(s, paths[0], remote_path)
+                os.remove(paths[0])
+        case _:
+            print("ERROR")
+
+    send_command(s, "QUIT\r\n")
+    print(receive_data(s))
+
+
+if __name__ == '__main__':
+    op, pa, p = parse_arguments()
+    main(op, pa, p)
