@@ -73,12 +73,16 @@ Receives a message from the server
 
 
 def receive_data(s):
+    message = None
     blocks = []
     msg_end = False
     while not msg_end:
         block = s.recv(2048)
-        if block == b'' and message:
-            return message
+        if block == b'':
+            if message:
+                return message
+            else:
+                raise RuntimeError("socket connection broken")
         blocks.append(block)
         message = b''.join(blocks).decode('UTF-8')
         if '\r\n' in message:
@@ -138,7 +142,7 @@ Deletes the file at the given path from the server
 
 
 def remove_file(s, path):
-    data_channel = open_data_channel(s)
+    open_data_channel(s)
     send_command(s, "DELE " + path + "\r\n")
     response = receive_data(s)
     print(response)
