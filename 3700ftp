@@ -92,7 +92,7 @@ def receive_data(s):
 
 
 '''
-Receives a message from the server
+Receives a message from the server in bytes and returns without decoding
 '''
 
 
@@ -110,6 +110,7 @@ def receive_byte_data(s):
 
 '''
 Sends a command to the server and prints the server's response
+This is left as a function to support print statements in verbose mode on later versions
 '''
 
 
@@ -126,9 +127,6 @@ def open_data_channel(control_channel):
     send_command(control_channel, "PASV\r\n")
     response = receive_data(control_channel)
     print(response)
-
-    if response[0:3] != "227":
-        print("hmmmm")
 
     response = response.split('(')[1]
     response = response.strip(').\r\n')
