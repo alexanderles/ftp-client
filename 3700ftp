@@ -92,6 +92,23 @@ def receive_data(s):
 
 
 '''
+Receives a message from the server
+'''
+
+
+def receive_byte_data(s):
+    message = b''
+    blocks = []
+    msg_end = False
+    while not msg_end:
+        block = s.recv(2048)
+        if block == b'':
+            return message
+        blocks.append(block)
+        message = b''.join(blocks)
+
+
+'''
 Sends a command to the server and prints the server's response
 '''
 
@@ -160,7 +177,7 @@ def download_file(s, src, dest):
     send_command(s, "RETR " + src + "\r\n")
     print(receive_data(s))
     with open(dest, 'wb') as file:
-        file.write(receive_data(data_channel).encode('UTF-8'))
+        file.write(receive_byte_data(data_channel))
         data_channel.close()
     print(receive_data(s))
 
@@ -175,7 +192,7 @@ def upload_file(s, src, dest):
     send_command(s, "STOR " + dest + "\r\n")
     print(receive_data(s))
     with open(src, 'rb') as local_file:
-        send_command(data_channel, local_file.read().decode('UTF-8'))
+        data_channel.send(local_file.read())
         data_channel.close()
 
 
