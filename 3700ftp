@@ -9,12 +9,11 @@ from urllib.parse import urlparse
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Process connection arguments")
     parser.add_argument("operation")
-    parser.add_argument("-p", "--port", required=False, default=21)
     parser.add_argument("paths", nargs='+')
 
     argument = parser.parse_args()
 
-    return argument.operation, argument.paths, argument.port
+    return argument.operation, argument.paths
 
 
 '''
@@ -42,8 +41,9 @@ def parse_ftp(ftp_url):
     password = parsed_url.password
     network = parsed_url.hostname
     path = parsed_url.path
+    port = parsed_url.port
 
-    return username, password, network, path
+    return username, password, network, path, port
 
 
 '''
@@ -199,11 +199,7 @@ Main method
 '''
 
 
-def main(operation, paths, port):
-    # Connect to the server
-    s = connect_to_server("ftp.3700.network", port)
-    print(receive_data(s))
-
+def main(operation, paths):
     if paths[0][0:6] == "ftp://":
         ftp_url = paths[0]
         first_path_remote = True
@@ -211,7 +207,16 @@ def main(operation, paths, port):
         ftp_url = paths[1]
         first_path_remote = False
 
-    username, password, network, remote_path = parse_ftp(ftp_url)
+    username, password, network, remote_path, port = parse_ftp(ftp_url)
+
+    # Use port 21 if no port is provided
+    if not port:
+        port = 21
+
+    # Connect to the server
+    s = connect_to_server(network, port)
+    print(receive_data(s))
+
     login(s, username, password)
 
     if operation == "ls":
@@ -242,5 +247,5 @@ def main(operation, paths, port):
 
 
 if __name__ == '__main__':
-    op, pa, p = parse_arguments()
-    main(op, pa, p)
+    op, pa = parse_arguments()
+    main(op, pa)
