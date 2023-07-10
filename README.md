@@ -1,4 +1,4 @@
-# Socket Basics Project
+# FTP Client
 
 ## Description (From Assignment)
 This project implements an FTP client which supports the following commands:
